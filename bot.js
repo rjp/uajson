@@ -36,6 +36,7 @@ function catcher(exitcode, callee) {
     }
 }
 
+var notifybot; // our UA bot
 var my_json = process.argv[2];
 
 var my_hash;
@@ -126,6 +127,7 @@ function send_by_email(x, uri) {
 
     // this should be refactored
     for(var i in x) {
+        var m;
         try {
             m = JSON.parse(x[i]);
         } catch(e) {
@@ -141,8 +143,10 @@ function send_by_email(x, uri) {
             m.flat_text = m.flat_text.substr(0,59) + '...';
         }
         m.to = (m.m_toname == undefined) ? '&nbsp;' : m.m_toname;
-        m.wrapped = String.wordwrap(m.text).replace(/\n\n/g, "<br/><br/>");
-
+        m.wrapped = String
+                    .wordwrap(m.text)
+                    .replace(/\n\n/g, "<br/><br/>")
+                    .replace(/\n>/g,  "<br/>&gt;");
         posts.push(m);
     }
 
@@ -180,15 +184,6 @@ function do_notify(x) {
 
 function notify_list(e, x) {
     buffer_to_strings(x);
-    for(var i in x) {
-        try {
-            item = JSON.parse(x[i]);
-        } catch(e) {
-            log.critical(sys.inspect(e));
-            log.critical(sys.inspect(x[i]));
-            process.exit(99);
-        }
-    }
     do_notify(x);
     notifybot.list = new_list();
 }
@@ -223,7 +218,7 @@ function extend(v1, v2) {
 // semi-flatten an EDF tree into a more usable JS object
 function flatten(q, prefix) {
     for(var i=0;i<q.children.length;i++){
-        if (prefix == undefined) {
+        if (prefix === undefined) {
             q[q.children[i].tag] = q.children[i].value
         } else {
             q[prefix + q.children[i].tag] = q.children[i].value
@@ -247,7 +242,7 @@ function reply_folder_list(a) {
 
 function reply_message_list(a) {
     // hoist the message part into the root with an m_ prefix
-    x = notifybot.getChild(a, 'message');
+    var x = notifybot.getChild(a, 'message');
     flatten(a);
     flatten(x, 'm_');
     extend(a, x);
@@ -256,36 +251,36 @@ function reply_message_list(a) {
     if (my_hash['ua:markread'] == undefined || ! my_hash['ua:markread']) {
         notifybot.request('message_mark_unread', { messageid: a.message, crossfolder: 1 });
     }
-    // is this post in a folder we're uanotify-subscribed to?
-    redis.sismember('user:'+auth+':subs', a.foldername, function(err, subscribed){
-        if (subscribed == 0) { return; } // do nothing, we're not subscribed here
 
-        log.info("post in a watched folder, "+a.foldername+", from "+a.fromname);
-        a.link = Math.uuid();
-        var json = JSON.stringify(a);
-//        redis.rpush(notifybot.list, json, function(){});
-        redis.set(a.link, json, function(){});
+    a.link = Math.uuid();
+    var json = JSON.stringify(a);
+    redis.set(a.link, json, function(){});
 
-        var us_folder = a.foldername.toUpperCase();
-//      var c_folder = parseInt(us_folder, 36); // (c) UA
-        var c_folder = a.folderid; // this is how UA sorts, we might as well keep it
-        // this assumes that a.message is monotonically increasing
-        // (at least within a folder, if not globally) and that 
-        // it'll stay below 10,000,000 (~ 30 years at current rate)
-        var score = 10000000 * c_folder + a.message;
-        log.info("adding to sorted list, us_folder="+us_folder+", score="+score);
-        redis.zadd('sorted:'+notifybot.list, score, a.link, function(err,x){sys.puts("zadd.err = "+err)});
-    });
+    var us_folder = a.foldername.toUpperCase();
+    var c_folder = a.folderid; // this is how UA sorts, we might as well keep it
+    // this assumes that a.message is monotonically increasing
+    // (at least within a folder, if not globally) and that 
+    // it'll stay below 10,000,000 (~ 30 years at current rate)
+    var score = 10000000 * c_folder + a.message;
+    log.info("adding to sorted list, us_folder="+us_folder+", score="+score);
+    redis.zadd('sorted:'+notifybot.list, score, a.link, function(err,x){sys.puts("zadd.err = "+err)});
 }
 
 function announce_message_add(a) {
     notifybot.flatten(a);
-    // default to requesting message bodies without marking them read
-    var rp = { messageid: a['messageid'], markread: 0 };
-    if (my_hash['ua:markread'] != undefined && my_hash['ua:markread']) {
-        delete rp['markread']; // absence makes the marking readier
-    }
-    notifybot.request('message_list', rp);
+    var auth = my_hash['auth:name'];
+
+    // is this post in a folder we're uanotify-subscribed to?
+    redis.sismember('user:'+auth+':subs', a.foldername, function(err, subscribed){
+        if (subscribed === 0) { return; } // do nothing, we're not subscribed here
+        log.info("post in a watched folder, "+a.foldername+", from "+a.fromname);
+	    // default to requesting message bodies without marking them read
+	    var rp = { messageid: a['messageid'], markread: 0 };
+	    if (my_hash['ua:markread'] != undefined && my_hash['ua:markread']) {
+	        delete rp['markread']; // absence makes the marking readier
+	    }
+	    notifybot.request('message_list', rp);
+    });
 }
 
 // TODO need a better way of updating the list without mass delete/insert
@@ -323,6 +318,6 @@ redis.get('user:'+my_hash['auth:name']+':currentlist', function(err, l){
     }
 });
 
-setInterval(log_levels, 30*1000); // change log levels every 30 seconds
+setInterval(log_levels, 90*1000); // change log levels every 30 seconds
 setInterval(periodic, my_hash['notify:freq'] * 1000);
 notifybot.connect(my_hash['ua:user'], my_hash['ua:pass'], my_hash['ua:server'], my_hash['ua:port']);
