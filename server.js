@@ -1,14 +1,20 @@
 var jade = require('jade');
 var sys = require('sys');
 var uaclient = require('uaclient');
-var notifo = require('notifo');
 var redisFactory = require('redis-node');
 var connect = require('connect');
 var auth = require('connect-auth');
 var spawn = require('child_process').spawn;
 var fs = require('fs');
-var Log = require('log'), log = new Log(Log.WARNING);
+var Log = require('log'), log = new Log(Log.INFO);
 require('./wordwrap.js');
+
+function cache_folders(child, ting) {
+}
+function announce_message_add(child, ting) {
+    child.flatten(ting);
+    sys.puts("AMA for "+child.username);
+}
 
 var api_keys = require(process.env.HOME + '/.apikeys.js');
 
@@ -165,19 +171,8 @@ function spawn_bot(user, reason) {
     }
 
     if (ua_sessions[user] != undefined) { // we have a flag
-        if (ua_sessions[user].process == undefined) { // did we just die?
-            var since_last = now - ua_sessions[user].last;
-            log.info(user+": time_check: "+since_last/1000+"s");
-            if (since_last < TooQuickSpawn) {
-                log.info(user+": too soon");
-            } else {
-                log.info(user+": time elapsed");
-                should_spawn = true;
-            }
-        } else {
-            log.info(user+": alive");
-            ua_sessions[user].last = now; // record the last alive time
-        }
+        log.info(user+": alive");
+        ua_sessions[user].last = now; // record the last alive time
     } else {
         log.info(user+": not alive");
         should_spawn = true;
@@ -217,38 +212,26 @@ function spawn_bot(user, reason) {
         profile['ua:server'] = config.ua_host;
         profile['ua:port'] = config.ua_port;
         profile['url:base'] = config.url_base;
-        var child = spawn('node', ['bot.js',JSON.stringify(profile)],{cwd: h});
-        ua_sessions[user] = { process: child, last: now, outputbuffer: new Array };
-        // print whatever we get from the bot
-        ua_sessions[user].process.stdout.on('data', function(data) {
-            var s_data = data.toString('utf8');
-            ua_sessions[user].outputbuffer.push(s_data);
-            // if we get to 15 lines, start removing them from the front
-            var l = ua_sessions[user].outputbuffer.length;
-            if (l > 15) { ua_sessions[user].outputbuffer.splice(0, 1); }
-            if (s_data.match(/WARNING|CRITICAL/i)) {
-                log.warning("<"+user+"> "+s_data);
-            } else {
-                log.info("<"+user+"> "+s_data);
-            }
+
+        var child = new uaclient.UAClient(log);
+        child.id = 0
+        child.shadow = 256;
+
+//        child.addListener("folders", cache_folders);
+        child.addListener("announce_message_add", function(a){
+            announce_message_add(child, a);
         });
-        ua_sessions[user].process.on('exit', function(code, signal) {
-            if (code > 0) { 
-                log.warning('bot disappeared, code is '+code);
-                log.warning(sys.inspect(ua_sessions[user].outputbuffer));
-            }
-            ua_sessions[user].process = undefined;
-        });
+        var pass = (user == 'rjp' ? 'rjp' : 'bot');
+        child.connect(user, pass, config['ua_host'], config['ua_port']);
+
+        ua_sessions[user] = { session: child, last: now };
     });
 }
 
 function spawn_bots(reason) {
-	redis.smembers('active:users', function(err, users) {
-	    debuffer_hash(users);
-	    for(var q in users) {
-            spawn_bot(users[q], reason);
-	    }
-	});
+    sys.puts("Nothing here, bots are spawned on demand.");
+    spawn_bot('rjp', 'flanges');
+    spawn_bot('bot', 'whores');
 }
 
 spawn_bots('boot');
