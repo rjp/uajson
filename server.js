@@ -214,6 +214,7 @@ function spawn_bot(user, reason) {
         profile['url:base'] = config.url_base;
 
         var child = new uaclient.UAClient(log);
+        child.exit_on_end = false;
         child.id = 0
         child.shadow = 256;
 
@@ -221,7 +222,15 @@ function spawn_bot(user, reason) {
         child.addListener("announce_message_add", function(a){
             announce_message_add(child, a);
         });
+
+        // when we get the finished event, remove ourselves
+        child.addListener('finished', function(){
+            log.warning("FINISHED, WIPING MY BRAINS");
+            ua_sessions[user] = undefined;
+        });
+
         var pass = (user == 'rjp' ? 'rjp' : 'bot');
+
         child.connect(user, pass, config['ua_host'], config['ua_port']);
 
         ua_sessions[user] = { session: child, last: now };
