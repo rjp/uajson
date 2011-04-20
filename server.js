@@ -291,37 +291,5 @@ function app(app) {
         res.writeHead(200, {'Content-Type':'text/html'});
         ua_sessions['rjp'].session.request('folder_list', {"searchtype":3});
     });
-    app.get('/settings', function(req,res){
-        req.authenticate(['basic'], function(err, authx){
-            var auth = req.getAuthDetails().user.username;
-            res.writeHead(200, {'Content-Type':'text/html'});
-            // TODO get the user folder subscription somewhere
-            get_user_info(auth, function(folders, subs, profile, sublist){
-                var z;
-                var s_f = []; for(var z in config.frequency) s_f.push(z); s_f.sort();
-
-                jade.renderFile('settings.html', { 
-                        locals: { 
-                            profile: profile, folders: folders, 
-                            subs: subs, f_keys: s_f,
-                            freq: config.frequency
-                        } 
-                    }, function(err, html){ 
-                        res.end(html); 
-                    }
-                );
-            });
-        });
-    });
-    app.get('/noauth', function(req, res) {
-        res.writeHead(200, {'Content-Type': 'text/html'});
-        res.end('NOT AUTHENTICATED, BUGGER OFF!');
-    });
-    app.get('/expired', function(req, res) {
-        res.writeHead(200, {'Content-Type': 'text/html'});
-        jade.renderFile('expired.html', {locals: {}}, function(err, html) {
-            res.end(html);
-        })
-    });
 }
 
