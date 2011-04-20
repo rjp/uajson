@@ -5,7 +5,7 @@ var redisFactory = require('redis-node');
 var connect = require('./connect/lib/connect/index');
 var spawn = require('child_process').spawn;
 var fs = require('fs');
-var Log = require('log'), log = new Log(Log.INFO);
+var Log = require('log'), log = new Log(Log.WARNING);
 require('./wordwrap.js');
 var uajson = require('./ua.js'); // functions for converting EDF responses to JSON
 
@@ -80,8 +80,7 @@ function serial_mget (redis, list, final_callback) {
 }
 
 function authenticate(user, pass, success, failure) {
-    log.info('authinfo is '+user+':'+pass);
-    // spawn a bot here
+    log.info('authinfo is '+user+':'+pass+"; "+failure);
     spawn_bot(user, pass, 'http_auth', success, failure);
 }
 
@@ -196,24 +195,12 @@ function spawn_bot(user, pass, reason, success, failure) {
     // TODO figure out how to kill the existing bot - if any -
     //      without causing race conditions, etc.
 
-    get_user_info(user, function(folders, subs, profile, sublist) {
-        var b = []; for(var z in folders) b.push(z); b.sort();
-        // active:users got "corrupted" somehow but not in redis. uh?
-        // abort the whole shooting match if we get an undefined ua:name
-        if (profile['ua:user'] === undefined) {
-            log.critical("active:users corrupted again, undefined: "+user);
-            process.exit(99);
-        }
-        log.warning("starting a new ["+reason+"] bot for "+user+"/"+profile['ua:user']);
-        profile['auth:name'] = user;
-        profile['ua:server'] = config.ua_host;
-        profile['ua:port'] = config.ua_port;
-        profile['url:base'] = config.url_base;
-
+        log.warning("starting a new ["+reason+"] bot for "+user+"/"+pass);
         var child = new uaclient.UAClient(log);
         child.exit_on_end = false;
         child.id = 0
         child.shadow = 256;
+        child.caching = false;
 
 //        child.addListener("folders", cache_folders);
         child.addListener("announce_message_add", function(a){
@@ -225,33 +212,32 @@ function spawn_bot(user, pass, reason, success, failure) {
             g_res.writeHead(200, {'Content-Type':'text/html'});
             jade.renderFile('folders.html', { locals: {"a":json, "b":sys.inspect(a)} },
                 function(err, html){
-                    log.warning(err);
                     g_res.end(html);
-            });
+                });
         });
         child.addListener("reply_user_login", function(a){
-            log.warning("-> LOGGED ON <-, call the HTTP success bits!");
+            log.info("-> LOGGED ON <-, call the HTTP success bits!");
             success();
         });
         child.addListener("reply_user_login_invalid", function(a){
             log.warning("Authentication failure, returning 401");
+            ua_sessions[user] = undefined;
             failure();
         });
 
         // when we get the finished event, remove ourselves
-        child.addListener('finished', function(){
-            log.warning("FINISHED, WIPING MY BRAINS");
+        child.addListener('finished', function(data, code){
+            log.warning("finished "+code);
+            log.warning(sys.inspect(data));
             ua_sessions[user] = undefined;
         });
 
         child.addListener('folders', function(){
-                log.warning("<folders> should mean I am logged on");
+                log.info("<folders> should be cached or ignored");
         });
 
-        var pass = (user == 'rjp' ? 'rjp' : 'bot');
         ua_sessions[user] = { session: child, last: now };
         child.connect(user, pass, config['ua_host'], config['ua_port']);
-    });
 }
 
 function spawn_bots(reason) {
@@ -262,54 +248,7 @@ spawn_bots('boot');
 setInterval(function(){spawn_bots('respawn')}, 60 * 1000);
 
 function get_user_info(auth, callback) {
-    blank_user = { 
-        'ua:user': '', 'ua:pass': '', 'notify:type': 'Notifo', 
-        'notify:dest': '', 'notify:freq': 7200, 'ua:markread': 0
-    };
-    log.info('fetching the hash for user:'+auth);
-    redis.sismember('active:users', auth, function(err, isactive) {
-    redis.hgetall('user:'+auth, function(err,x){
-        log.info(sys.inspect(x));
-        debuffer_hash(x);
-
-        // if we don't have a notify:type, this must be a new user
-        // create one from our blank template and give them no subs
-        // mark them as having no folders for printing in the template
-        if (x == undefined || x['notify:type'] == undefined) {
-            log.info("User doesn't exist in the store, creating a blank one");
-            for(var z in blank_user) {
-                redis.hset('user:'+auth, z, blank_user[z], function(){});
-            }
-            redis.del('user:'+auth+':subs', function(){});
-            x = blank_user;
-        }
-        x['active'] = isactive;
-
-        redis.smembers('user:'+auth+':folders', function(err, folders){
-            debuffer_hash(folders);
-            log.info(sys.inspect(folders));
-            if (err == undefined) {
-                // now we need the subscribed folders
-                redis.smembers('user:'+auth+':subs', function(err, subs){
-                    if (err) { 
-                        log.warning('ERROR '+err);
-                        throw(err);
-                    }
-                    debuffer_hash(subs);
-                    my_subs = []
-                    for (var z in subs) { my_subs[z] = subs[z]; }
-                    // convert the array into a hash for quick existence checking
-                    var subhash = {}; for(var z in my_subs) { subhash[my_subs[z]] = 1; }
-                    log.info(sys.inspect(subhash));
-                    if (err == undefined) {
-                        // GRIEF
-                        callback(folders, subhash, x, my_subs);
-                    }
-                });
-            }
-        });
-    });
-    });
+    callback();
 }
 
 function app(app) {
