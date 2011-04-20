@@ -1,0 +1,3 @@
+[submodule "connect"]
+	path = connect
+	url = git://github.com/rjp/connect.git
