@@ -8,6 +8,12 @@ var spawn = require('child_process').spawn;
 var fs = require('fs');
 var Log = require('log'), log = new Log(Log.INFO);
 require('./wordwrap.js');
+var uajson = require('./ua.js'); // functions for converting EDF responses to JSON
+
+var uajson = new uajson.uajson;
+
+var g_req;
+var g_res;
 
 function cache_folders(child, ting) {
 }
@@ -77,18 +83,9 @@ function serial_mget (redis, list, final_callback) {
 }
 
 function authenticate(user, pass, success, failure) {
-    log.info('pass is '+pass);
-    log.info('getting the key auth:'+user);
-    redis.get('auth:'+user, function(err, result) {
-        var real_pass = result.toString('utf8');
-        log.info('real pass is '+real_pass);
-        if (pass == real_pass) {
-            log.info('AUTHENTICATED, PROCEEDING');
-            success();
-        } else {
-            failure();
-        }
-    });
+    log.info('authinfo is '+user+':'+pass);
+    // spawn a bot here
+    spawn_bot(user, pass, 'http_auth', success, failure);
 }
 
 function output_message(req, res, x, t) {
@@ -162,25 +159,27 @@ function debuffer_hash(h) {
 }
 
 // reason is 'boot', 'settings' or 'interval'
-function spawn_bot(user, reason) {
+function spawn_bot(user, pass, reason, success, failure) {
     var should_spawn = false; // default to not spawning
     var now = new Date().getTime();
 
     if (reason == 'boot' || reason == 'settings') { // always spawn at boot or on settings change
+        log.warning("SB: forced respawn: "+reason);
         should_spawn = true;
     }
 
     if (ua_sessions[user] != undefined) { // we have a flag
-        log.info(user+": alive");
+        log.info("SB: "+user+": alive");
         ua_sessions[user].last = now; // record the last alive time
     } else {
-        log.info(user+": not alive");
+        log.info("SB: "+user+": not alive");
         should_spawn = true;
     }
 
     // don't spawn 
     if (! should_spawn) { 
-        log.info(user+": not spawning");
+        log.info("SB: "+user+": not spawning");
+        success();
         return; 
     }
 
@@ -193,6 +192,7 @@ function spawn_bot(user, reason) {
     // now we have two bots running, stupidly
     if (reason == 'respawn' && ua_sessions[auth] && ua_sessions[auth].process) {
         log.warning(user+": respawn abandoned, bot alive?");
+        success();
         return;
     }
 
@@ -223,24 +223,42 @@ function spawn_bot(user, reason) {
             announce_message_add(child, a);
         });
 
+        child.addListener("reply_folder_list", function(a){
+            var json = uajson.reply_folder_list(a, child);
+            g_res.writeHead(200, {'Content-Type':'text/html'});
+            jade.renderFile('folders.html', { locals: {"a":json, "b":sys.inspect(a)} },
+                function(err, html){
+                    log.warning(err);
+                    g_res.end(html);
+            });
+        });
+        child.addListener("reply_user_login", function(a){
+            log.warning("-> LOGGED ON <-, call the HTTP success bits!");
+            success();
+        });
+        child.addListener("reply_user_login_invalid", function(a){
+            log.warning("Authentication failure, returning 401");
+            failure();
+        });
+
         // when we get the finished event, remove ourselves
         child.addListener('finished', function(){
             log.warning("FINISHED, WIPING MY BRAINS");
             ua_sessions[user] = undefined;
         });
 
+        child.addListener('folders', function(){
+                log.warning("<folders> should mean I am logged on");
+        });
+
         var pass = (user == 'rjp' ? 'rjp' : 'bot');
-
-        child.connect(user, pass, config['ua_host'], config['ua_port']);
-
         ua_sessions[user] = { session: child, last: now };
+        child.connect(user, pass, config['ua_host'], config['ua_port']);
     });
 }
 
 function spawn_bots(reason) {
     sys.puts("Nothing here, bots are spawned on demand.");
-    spawn_bot('rjp', 'flanges');
-    spawn_bot('bot', 'whores');
 }
 
 spawn_bots('boot');
@@ -394,27 +412,13 @@ function app(app) {
         });
     });
     app.get('/folders', function(req,res){
+        g_req = req;
+        g_res = res;
         req.authenticate(['basic'], function(err, authx){
-            var auth = req.getAuthDetails().user.username;
+//            var auth = req.getAuthDetails().user.username;
             res.writeHead(200, {'Content-Type':'text/html'});
+            ua_sessions['rjp'].session.request('folder_list', {"searchtype":3});
             // TODO get the user folder subscription somewhere
-            get_user_info(auth, function(folders, subs, profile, sublist){
-                var b = []; 
-                var safe_folders = {};
-                for(var z in folders) {
-                    var q = folders[z];
-                    b.push(q);
-                    safe_folders[q] = q.replace(/[^a-zA-Z0-9]/g, ':')                    
-                    log.info("SF "+q+" = "+safe_folders[q]);
-                }
-                b.sort();
-                log.info("Sorted B = "+ sys.inspect(b));
-                jade.renderFile('folders.html', { locals: { profile: profile, folders: folders, fkeys: b, subs: subs, safe: safe_folders } },
-                    function(err, html){ 
-                    log.warning(err);
-                    res.end(html); 
-                });
-            });
         });
     });
     app.get('/settings', function(req,res){
