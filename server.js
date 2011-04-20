@@ -2,8 +2,7 @@ var jade = require('jade');
 var sys = require('sys');
 var uaclient = require('uaclient');
 var redisFactory = require('redis-node');
-var connect = require('connect');
-var auth = require('connect-auth');
+var connect = require('./connect/lib/connect/index');
 var spawn = require('child_process').spawn;
 var fs = require('fs');
 var Log = require('log'), log = new Log(Log.INFO);
@@ -39,12 +38,10 @@ if (config.frequency == undefined) {
 var server = connect.createServer(
     connect.logger({ format: ':method :url' }),
     connect.bodyDecoder(),
-    auth([
-        auth.Basic({validatePassword: authenticate, realm: 'uanotify'})
-    ]),
-    connect.router(app),
     connect.errorHandler({ dumpExceptions: true, showStack: true })
 );
+server.use(connect.basicAuth(authenticate, 'uajson'));
+server.use('/', connect.router(app));
 
 server.listen(config.port);
 log.info('Connect server listening on port '+config.port);
@@ -348,78 +345,12 @@ function app(app) {
         });
         console.log('return list '+req.params.id)
     });
-    app.get('/profile', function(req,res,params){
-        req.authenticate(['basic'], function(err, authx){
-            var auth = req.getAuthDetails().user.username;
-            log.info('AUTHENTICATED AS '+auth);
-            res.writeHead(200, {'Content-Type':'text/html'});
-            get_user_info(auth, function(folders, subs, profile, sublist){
-                var b = []; for(var z in sublist) { b.push(sublist[z]); } b.sort();
-                log.info(sys.inspect(b));
-                jade.renderFile('profile.html', { locals: { profile: profile, folders: folders, subs: subs, sublist: sublist, freq: config.frequency, s_f: b.join(', ') } },
-                    function(err, html){ 
-                    log.info(err);
-                    res.end(html); 
-                });
-            });
-        });
-    });
-    app.post('/updatefolders', function(req,res){
-        req.authenticate(['basic'], function(err, authx){
-            var auth = req.getAuthDetails().user.username;
-            redis.del('user:'+auth+':subs', function(){
-                for(var z in req.body) {
-                    log.info("parameter "+z+" = "+req.body[z]);
-                    if (z.substr(0,4) == 'sub_') {
-                        redis.sadd('user:'+auth+':subs', req.body[z]);
-                    }
-                }
-            });
-
-            res.writeHead(302, { Location: '/profile' });
-            res.end();
-        });
-    });
-    app.post('/update', function(req,res){
-        req.authenticate(['basic'], function(err, authx){
-            var auth = req.getAuthDetails().user.username;
-            var hash = {};
-            hash['ua:user'] = req.body.user;
-            hash['ua:pass'] = req.body.pass;
-            hash['notify:type'] = req.body.type;
-            hash['notify:dest'] = req.body.dest;
-            hash['notify:freq'] = req.body.freq;
-            hash['ua:markread'] = req.body.markread;
-            for(var z in hash) {
-                redis.hset('user:'+auth, z, hash[z], function(){});
-            }
-            // stop any UA session they have running and start a new one
-            if (ua_sessions[auth]) { 
-                log.info("killing old bot session for "+auth);
-                ua_sessions[auth].process.kill();
-            } 
-            if (req.body.active) {
-                redis.sadd('active:users', auth, function(){});
-                spawn_bot(auth, 'settings');
-            } else {
-                redis.srem('active:users', auth, function(){});
-                log.info("not spawning a new bot for "+hash['ua:user']);
-            }
-
-            log.info(sys.inspect(hash));
-            res.writeHead(302, { Location: '/profile' });
-            res.end();
-        });
-    });
     app.get('/folders', function(req,res){
         g_req = req;
         g_res = res;
-        req.authenticate(['basic'], function(err, authx){
-//            var auth = req.getAuthDetails().user.username;
-            res.writeHead(200, {'Content-Type':'text/html'});
-            ua_sessions['rjp'].session.request('folder_list', {"searchtype":3});
-            // TODO get the user folder subscription somewhere
-        });
+        log.warning("Auth OK, requesting a folder list");
+        res.writeHead(200, {'Content-Type':'text/html'});
+        ua_sessions['rjp'].session.request('folder_list', {"searchtype":3});
     });
     app.get('/settings', function(req,res){
         req.authenticate(['basic'], function(err, authx){
