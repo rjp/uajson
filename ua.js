@@ -1,22 +1,32 @@
 var sys = require('sys');
 
+// bloody tree structure idiot nonsense
+function flatten_folder_list(edf, child, depth) {
+    var json = [];
+    for(i in edf.children) {
+        if (edf.children[i].tag == 'folder') {
+            var x = edf.children[i];
+            child.flatten(x);
+            json.push({"folder": x.name, "unread": x.unread||0,
+                       "count": x.nummsgs, "subscribed": x.subscribed
+            });
+            if (x.children) {
+                for(var i in x.children) {
+                    var d = flatten_folder_list(x.children[i], child, depth+1);
+                    json = json.concat(d);
+                }
+            }
+        };
+    };
+    return json;
+}
+
 function uajson() {
 };
 
     uajson.prototype.reply_folder_list = function(edfjson, child) {
         child.flatten(edfjson);
-        var json = [] ;
-        for(i in edfjson.children) {
-        sys.puts(JSON.stringify(edfjson.children[i]));
-            if (edfjson.children[i].tag == 'folder') {
-                var x = edfjson.children[i];
-                child.flatten(x);
-                json.push({
-                    "folder": x.name, "unread": x.unread||0,
-                    "count": x.nummsgs, "subscribed": x.subscribed
-                });
-            };
-        };
+        var json = flatten_folder_list(edfjson, child, 0);
         return json;
     };
 
@@ -28,7 +38,6 @@ function uajson() {
             if (edfjson.children[i].tag == 'message') {
                 var x = edfjson.children[i];
                 child.flatten(x);
-                sys.puts(sys.inspect(x));
                 var retval = {
                     "folder": folder, "epoch": x.date,
                     "id": x.value, "subject": x.subject,
@@ -41,7 +50,6 @@ function uajson() {
                     var c = edfjson.children[i].children[j];
                     if (c.tag == 'replyto') {
                         child.flatten(c);
-                        sys.puts(sys.inspect(c));
                         parents.push({"id":c.value, "from":c.fromname});
                         retval['inReplyTo'] = c.value;
                     }
@@ -55,7 +63,6 @@ function uajson() {
                     var c = edfjson.children[i].children[j];
                     if (c.tag == 'replyby') {
                         child.flatten(c);
-                        sys.puts(sys.inspect(c));
                         replies.push({"id":c.value, "from":c.fromname});
                     }
                 }
