@@ -52,7 +52,7 @@ var server = connect.createServer(
     connect.bodyDecoder(),
     connect.errorHandler({ dumpExceptions: true, showStack: true })
 );
-server.use(connect.basicAuth(authenticate, 'uajson'));
+server.use(connect.basicAuth(authenticate, 'uajson:'+config.port));
 server.use('/', connect.router(app));
 
 server.listen(config.port);
@@ -213,7 +213,8 @@ function get_user_info(auth, callback) {
 
 function app(app) {
     app.post('/message/read', function(req, res) {
-        var messages = JSON.parse(req.body.messages);
+            log.info(req.body);
+        var messages = req.body;
         log.info(sys.inspect(messages));
         var my_key = req.remoteUser;
         var myself = ua_sessions[my_key].session;
