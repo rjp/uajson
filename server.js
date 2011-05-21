@@ -175,7 +175,9 @@ function spawn_bot(user, pass, reason, success, failure) {
         });
         child.addListener("reply_user_login", function(a){
             log.info("-> LOGGED ON <-, pending folders");
-            child.req_folder_list(child, success);
+            child.req_folder_list(child, function(){
+                child.req_user_list(child, success);
+            });
         });
         child.addListener("reply_user_login_invalid", function(a){
             log.warning("Authentication failure, returning 401");
