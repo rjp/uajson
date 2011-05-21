@@ -1,3 +1,6 @@
 [submodule "connect"]
 	path = connect
 	url = git://github.com/rjp/connect.git
+[submodule "node-uaclient"]
+	path = node-uaclient
+	url = git@github.com:rjp/node-uaclient.git

@@ -1,6 +1,6 @@
 var jade = require('jade');
 var sys = require('sys');
-var uaclient = require('uaclient');
+var uaclient = require('./uaclient/lib/uaclient');
 var connect = require('./connect/lib/connect/index');
 var fs = require('fs');
 var Log = require('log'), log = new Log(Log.INFO);
