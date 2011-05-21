@@ -106,6 +106,26 @@ function map(list, each_callback, final_callback) {
     }
 };
 
+function remove_undef(list) {
+    var outlist = [];
+    for (var i in list) {
+        if (list.hasOwnProperty(i)) {
+            if (list[i] != undefined) { outlist.push(list[i]); }
+        }
+    }
+    return outlist;
+}
+
+function mark_read_mid(myself, item, key, callback) {
+    myself.request('message_mark_read', {"messageid":item}, function(t,a) {
+        if (t === "message_mark_read") {
+            callback(undefined, item);
+        } else {
+            callback(undefined, undefined);
+        }
+    });
+}
+
 // reason is 'boot', 'settings' or 'interval'
 function spawn_bot(user, pass, reason, success, failure) {
     var should_spawn = false; // default to not spawning
@@ -219,10 +239,11 @@ function app(app) {
         var my_key = req.remoteUser;
         var myself = ua_sessions[my_key].session;
         map(messages, function(f, i, c) {
-            myself.request('message_mark_read', {"messageid":f}, c);
+            mark_read_mid(myself, f, i, c);
         }, function(e, newlist) {
+            var outlist = remove_undef(newlist);
             res.writeHead(200, {'Content-Type':'application/json'});
-            res.end(JSON.stringify({"ok":"ok"}));
+            res.end(JSON.stringify({"count": outlist.length}));
         });
     });
 
