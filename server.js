@@ -37,12 +37,6 @@ function announce_message_add(child, ting) {
     sys.puts("AMA for "+child.username);
 }
 
-var api_keys = require(process.env.HOME + '/.apikeys.js');
-
-var TooQuickSpawn = 5 * 60 * 1000; // 5 minutes
-
-var h = process.cwd();
-
 var config_json = fs.readFileSync(process.argv[2], 'utf8');
 var config = JSON.parse(config_json);
 
