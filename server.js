@@ -13,7 +13,7 @@ var g_req;
 var g_res;
 var g_folders = {};
 
-var SESSION_TIMEOUT = 300 * 1000;
+var SESSION_TIMEOUT = 900 * 1000;
 
 // use a hashed mix for the session key to avoid hijacking
 var crypto = require('crypto');
