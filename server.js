@@ -340,6 +340,40 @@ function app(app) {
             });
         });
     });
+
+    app.post('/folder/:name', function(req, res) {
+        var post = req.body;
+        var my_key = req.remoteUser;
+        var myself = ua_sessions[my_key].session;
+        var request = { "subject": post.subject, "text": post.body };
+        if (post.to !== undefined) {
+            var userid = myself.get_user(post.to);
+            if (userid !== undefined) {
+                request.toid = userid.value;
+            } else {
+                request.toname = post.to;
+            }
+        }
+        log.info("folder "+req.params.name+" = "+myself.folders[req.params.name]);
+        request.folderid = myself.folders[req.params.name];
+        log.info(JSON.stringify(request));
+        myself.request('message_add', request, function(t, a) {
+            log.info("t="+t+", "+JSON.stringify(a));
+            if (t == 'message_add') {
+                myself.flatten(a);
+                res.writeHead(200, {'Content-Type':'application/json'});
+                var epoch = new Date().getTime() / 1000;
+                res.end(JSON.stringify({
+                    "id":a.messageid, "folder":req.params.name,
+                    "epoch": epoch, "thread":a.messageid
+                }));
+            } else {
+            // FIXME this needs to be more complex to handle the full range
+                res.writeHead(500, {'Content-Type':'application/json'});
+                res.end(JSON.stringify({"error":"could not add post"}));
+            }
+        });
+    });
 }
 
 function reaper() {
