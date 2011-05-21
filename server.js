@@ -134,11 +134,11 @@ function spawn_bot(user, pass, reason, success, failure) {
         should_spawn = true;
     }
 
-    // don't spawn 
-    if (! should_spawn) { 
+    // don't spawn
+    if (! should_spawn) {
         log.info("SB: "+user+": not spawning");
         success();
-        return; 
+        return;
     }
 
     // if we're supposed to spawn because of a respawn...
@@ -175,8 +175,7 @@ function spawn_bot(user, pass, reason, success, failure) {
         });
         child.addListener("reply_user_login", function(a){
             log.info("-> LOGGED ON <-, pending folders");
-            child.req_folder_list(child);
-            success();
+            child.req_folder_list(child, success);
         });
         child.addListener("reply_user_login_invalid", function(a){
             log.warning("Authentication failure, returning 401");
@@ -230,7 +229,7 @@ function app(app) {
         var my_key = req.remoteUser;
         var myself = ua_sessions[my_key].session;
         myself.request('message_list', {"messageid":parseInt(req.params.id, 10)}, function(t, a) {
-                if (t == 'message_list') { 
+                if (t == 'message_list') {
                     log.info(sys.inspect(a));
 		            var json = uajson.reply_message_list(a, myself);
                     res.writeHead(200, {'Content-Type':'application/json'});
@@ -297,6 +296,33 @@ function app(app) {
         res.end(JSON.stringify({"banner":"No banner here"}));
     });
 
+    app.get('/user', function(req, res){
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({"name":req.remoteUser}));
+    });
+
+    app.get('/folder/:name/unread', function(req,res){
+        log.warning("Auth OK, requesting a message list");
+        res.writeHead(200, {'Content-Type':'application/json'});
+        var folder = req.params.name.toLowerCase();
+        folder_info(folder, function(folderinfo){
+            // tricky!
+            var my_key = req.remoteUser;
+            var myself = ua_sessions[my_key].session;
+            myself.request('message_list', {"folderid":folderinfo.folder_id, "searchtype":1}, function(t, a) {
+	            var raw_json = uajson.reply_message_list(a, myself);
+                var json = [];
+                for (var i in raw_json) {
+                    if (raw_json.hasOwnProperty(i) &&
+                        ! raw_json[i].hasOwnProperty('read')) {
+                        json.push(raw_json[i]);
+                    }
+                }
+	            res.writeHead(200, {'Content-Type':'application/json'});
+	            res.end(JSON.stringify(json));
+            });
+        });
+    });
     app.get('/folder/:name', function(req,res){
         log.warning("Auth OK, requesting a message list");
         res.writeHead(200, {'Content-Type':'application/json'});
