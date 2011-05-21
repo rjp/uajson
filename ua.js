@@ -9,7 +9,8 @@ function flatten_folder_list(edf, child, depth) {
             var x = edf[i];
             child.flatten(x);
             json.push({"folder": x.name, "unread": x.unread||0,
-                       "count": x.nummsgs, "subscribed": x.subscribed
+                       "count": x.nummsgs, "subscribed": x.subscribed,
+                       "id": x.value
             });
             if (x.children) {
                 for(var i in x.children) {
