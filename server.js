@@ -326,18 +326,17 @@ function app(app) {
         });
     });
     app.get('/folder/:name', function(req,res){
-        log.warning("Auth OK, requesting a message list");
         res.writeHead(200, {'Content-Type':'application/json'});
-        var folder = req.params.name.toLowerCase();
-        folder_info(folder, function(folderinfo){
-            // tricky!
-            var my_key = req.remoteUser;
-            var myself = ua_sessions[my_key].session;
-            myself.request('message_list', {"folderid":folderinfo.folder_id, "searchtype":1}, function(t, a) {
-	            var json = uajson.reply_message_list(a, myself);
-	            res.writeHead(200, {'Content-Type':'application/json'});
-	            res.end(JSON.stringify(json));
-            });
+        var folder = req.params.name;
+        // tricky!
+        var my_key = req.remoteUser;
+        var myself = ua_sessions[my_key].session;
+        var folder_id = myself.folders[folder];
+        log.warning("Auth OK, requesting a message list for "+folder+" = "+folder_id);
+        myself.request('message_list', {"folderid":folder_id, "searchtype":1}, function(t, a) {
+	        var json = uajson.reply_message_list(a, myself);
+	        res.writeHead(200, {'Content-Type':'application/json'});
+	        res.end(JSON.stringify(json));
         });
     });
 
