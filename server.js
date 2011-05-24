@@ -339,6 +339,43 @@ function app(app) {
             });
         });
     });
+
+    app.get('/folder/:name/unread/full', function(req,res){
+        log.warning("Auth OK, requesting a message list");
+        res.writeHead(200, {'Content-Type':'application/json'});
+        var folder = req.params.name.toLowerCase();
+        folder_info(folder, function(folderinfo){
+            // tricky!
+            var my_key = req.remoteUser;
+            var myself = ua_sessions[my_key].session;
+            myself.request('message_list', {"folderid":folderinfo.folder_id, "searchtype":1}, function(t, a) {
+	            var raw_json = uajson.reply_message_list(a, myself);
+                var json = [];
+                for (var i in raw_json) {
+                    if (raw_json.hasOwnProperty(i) &&
+                        ! raw_json[i].hasOwnProperty('read')) {
+                        json.push(raw_json[i]);
+                    }
+                }
+                map(json, function(item, index, callback) {
+                    sys.puts(sys.inspect(item));
+                    myself.request('message_list', {"messageid": item.id}, function(t, a) {
+			            var raw_msg = uajson.reply_message_list(a, myself);
+		                var message = [];
+		                for (var i in raw_msg) {
+		                    if (raw_msg.hasOwnProperty(i)) {
+		                        message.push(raw_msg[i]);
+		                    }
+		                }
+                        callback(undefined, message[0]);
+                    })
+                }, function(error, newlist) {
+	                res.writeHead(200, {'Content-Type':'application/json'});
+                    res.end(JSON.stringify(newlist));
+                });
+            });
+        });
+    });
     app.get('/folder/:name', function(req,res){
         res.writeHead(200, {'Content-Type':'application/json'});
         var folder = req.params.name;
