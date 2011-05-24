@@ -11,6 +11,7 @@ var uajson = new uajson.uajson;
 var g_req;
 var g_res;
 var g_folders = {};
+var g_bodies = {};
 
 var SESSION_TIMEOUT = 900 * 1000;
 
@@ -358,17 +359,23 @@ function app(app) {
                     }
                 }
                 map(json, function(item, index, callback) {
-                    sys.puts(sys.inspect(item));
-                    myself.request('message_list', {"messageid": item.id}, function(t, a) {
-			            var raw_msg = uajson.reply_message_list(a, myself);
-		                var message = [];
-		                for (var i in raw_msg) {
-		                    if (raw_msg.hasOwnProperty(i)) {
-		                        message.push(raw_msg[i]);
-		                    }
-		                }
-                        callback(undefined, message[0]);
-                    })
+                    if (g_bodies[item.id] === undefined) {
+                        log.info("raw fetching "+item.id);
+	                    myself.request('message_list', {"messageid": item.id}, function(t, a) {
+				            var raw_msg = uajson.reply_message_list(a, myself);
+			                var message = [];
+			                for (var i in raw_msg) {
+			                    if (raw_msg.hasOwnProperty(i)) {
+			                        message.push(raw_msg[i]);
+			                    }
+			                }
+                            g_bodies[item.id] = message[0];
+	                        callback(undefined, message[0]);
+	                    })
+                    } else {
+                        log.info("cached "+item.id);
+                        callback(undefined, g_bodies[item.id]);
+                    }
                 }, function(error, newlist) {
 	                res.writeHead(200, {'Content-Type':'application/json'});
                     res.end(JSON.stringify(newlist));
