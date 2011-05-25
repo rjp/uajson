@@ -232,7 +232,6 @@ function get_folders(uaclient, callback) {
     });
 }
 
-
 function get_unread_folders(uaclient, callback) {
     get_folders(uaclient, function(raw_json) {
         var json = [];
@@ -475,6 +474,31 @@ function app(app) {
                 res.writeHead(500, {'Content-Type':'application/json'});
                 res.end(JSON.stringify({"error":"could not add post"}));
             }
+        });
+    });
+
+    app.get('/threads/unread', function(req, res) {
+        var my_key = req.remoteUser;
+        var myself = ua_sessions[my_key].session;
+        get_unread_folders(myself, function(json) {
+            map(json, function(item, index, callback) {
+                log.info("recursing into "+sys.inspect(item));
+                get_unread_messages(item.folder, myself, function(v){
+                    callback(undefined, v);
+                });
+            }, function(error, newlist) {
+                res.writeHead(200, {'Content-Type':'application/json'});
+                var flattened = newlist.reduce(function(a,b){
+                    return a.concat(b);
+                });
+                flattened.sort(function(a, b) {
+                    if (a.subject == b.subject) {
+                        return a.id - b.id;
+                    }
+                    return a.subject < b.subject ? -1 : 1;
+                });
+                res.end(JSON.stringify(flattened));
+            });
         });
     });
 }
