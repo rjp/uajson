@@ -282,17 +282,9 @@ function app(app) {
         // tricky!
         var my_key = req.remoteUser;
         var myself = ua_sessions[my_key].session;
-        myself.request('folder_list', {"searchtype":3}, function(t, a) {
-	            var raw_json = uajson.reply_folder_list(a, myself);
-                var json = [];
-                for (var i in raw_json) {
-                    if (raw_json.hasOwnProperty(i) &&
-                        raw_json[i].unread > 0) {
-                        json.push(raw_json[i]);
-                    }
-                }
-                res.writeHead(200, {'Content-Type':'application/json'});
-                res.end(JSON.stringify(json));
+        get_unread_folders(myself, function(json) {
+            res.writeHead(200, {'Content-Type':'application/json'});
+            res.end(JSON.stringify(json));
         });
     });
 
@@ -320,10 +312,9 @@ function app(app) {
         // tricky!
         var my_key = req.remoteUser;
         var myself = ua_sessions[my_key].session;
-        myself.request('folder_list', {"searchtype":3}, function(t, a) {
-	            var json = uajson.reply_folder_list(a, myself);
-                res.writeHead(200, {'Content-Type':'application/json'});
-                res.end(JSON.stringify(json));
+        get_folders(myself, function(json) {
+            res.writeHead(200, {'Content-Type':'application/json'});
+            res.end(JSON.stringify(json));
         });
     });
 
