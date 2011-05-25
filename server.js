@@ -245,6 +245,54 @@ function get_unread_folders(uaclient, callback) {
     });
 }
 
+// get all messages from a folder
+function get_messages(folder, uaclient, callback) {
+        var folder_id = uaclient.folders[folder];
+        uaclient.request('message_list', {"folderid":folder_id, "searchtype":1}, function(t, a) {
+	        var json = uajson.reply_message_list(a, uaclient);
+            callback(json);
+        });
+}
+
+// get the unread messages from a folder
+function get_unread_messages(folder, uaclient, callback) {
+    var folder_id = uaclient.folders[folder];
+    uaclient.request('message_list', {"folderid":folder_id, "searchtype":1}, function(t, a) {
+        var raw_json = uajson.reply_message_list(a, uaclient);
+        var json = [];
+        for (var i in raw_json) {
+            if ( raw_json.hasOwnProperty(i) &&
+                !raw_json[i].hasOwnProperty('read')) {
+                json.push(raw_json[i]);
+            }
+        }
+        callback(json);
+    });
+}
+
+// this expects to be an (e, v) type callback
+function get_message_body(mid, uaclient, callback) {
+    if (g_bodies[mid] === undefined) {
+        uaclient.request('message_list', {"messageid": mid}, function(t, a) {
+	        var raw_msg = uajson.reply_message_list(a, uaclient);
+            g_bodies[mid] = raw_msg[0];
+	        callback(undefined, raw_msg[0]);
+	    })
+    } else {
+        callback(undefined, g_bodies[mid]);
+    }
+}
+
+function get_full_unread_messages(folder, uaclient, callback) {
+    get_unread_messages(folder, uaclient, function(json) {
+        map(json, function(item, index, callback) {
+            get_message_body(item.id, uaclient, callback)
+        }, function(error, newlist) {
+            callback(newlist);
+        });
+    });
+}
+
 function app(app) {
     app.post('/message/read', function(req, res) {
             log.info(req.body);
@@ -329,80 +377,30 @@ function app(app) {
     });
 
     app.get('/folder/:name/unread', function(req,res){
-        log.warning("Auth OK, requesting a message list");
-        res.writeHead(200, {'Content-Type':'application/json'});
-        var folder = req.params.name.toLowerCase();
-        folder_info(folder, function(folderinfo){
-            // tricky!
-            var my_key = req.remoteUser;
-            var myself = ua_sessions[my_key].session;
-            myself.request('message_list', {"folderid":folderinfo.folder_id, "searchtype":1}, function(t, a) {
-	            var raw_json = uajson.reply_message_list(a, myself);
-                var json = [];
-                for (var i in raw_json) {
-                    if (raw_json.hasOwnProperty(i) &&
-                        ! raw_json[i].hasOwnProperty('read')) {
-                        json.push(raw_json[i]);
-                    }
-                }
-	            res.writeHead(200, {'Content-Type':'application/json'});
-	            res.end(JSON.stringify(json));
-            });
+        var folder = req.params.name;
+        var my_key = req.remoteUser;
+        var myself = ua_sessions[my_key].session;
+        get_unread_messages(folder, myself, function(json) {
+            res.writeHead(200, {'Content-Type':'application/json'});
+            res.end(JSON.stringify(json));
         });
     });
 
     app.get('/folder/:name/unread/full', function(req,res){
-        log.warning("Auth OK, requesting a message list");
-        res.writeHead(200, {'Content-Type':'application/json'});
-        var folder = req.params.name.toLowerCase();
-        folder_info(folder, function(folderinfo){
-            // tricky!
-            var my_key = req.remoteUser;
-            var myself = ua_sessions[my_key].session;
-            myself.request('message_list', {"folderid":folderinfo.folder_id, "searchtype":1}, function(t, a) {
-	            var raw_json = uajson.reply_message_list(a, myself);
-                var json = [];
-                for (var i in raw_json) {
-                    if (raw_json.hasOwnProperty(i) &&
-                        ! raw_json[i].hasOwnProperty('read')) {
-                        json.push(raw_json[i]);
-                    }
-                }
-                map(json, function(item, index, callback) {
-                    if (g_bodies[item.id] === undefined) {
-                        log.info("raw fetching "+item.id);
-	                    myself.request('message_list', {"messageid": item.id}, function(t, a) {
-				            var raw_msg = uajson.reply_message_list(a, myself);
-			                var message = [];
-			                for (var i in raw_msg) {
-			                    if (raw_msg.hasOwnProperty(i)) {
-			                        message.push(raw_msg[i]);
-			                    }
-			                }
-                            g_bodies[item.id] = message[0];
-	                        callback(undefined, message[0]);
-	                    })
-                    } else {
-                        log.info("cached "+item.id);
-                        callback(undefined, g_bodies[item.id]);
-                    }
-                }, function(error, newlist) {
-	                res.writeHead(200, {'Content-Type':'application/json'});
-                    res.end(JSON.stringify(newlist));
-                });
-            });
-        });
-    });
-    app.get('/folder/:name', function(req,res){
-        res.writeHead(200, {'Content-Type':'application/json'});
         var folder = req.params.name;
-        // tricky!
         var my_key = req.remoteUser;
         var myself = ua_sessions[my_key].session;
-        var folder_id = myself.folders[folder];
-        log.warning("Auth OK, requesting a message list for "+folder+" = "+folder_id);
-        myself.request('message_list', {"folderid":folder_id, "searchtype":1}, function(t, a) {
-	        var json = uajson.reply_message_list(a, myself);
+        get_full_unread_messages(folder, myself, function(json) {
+            res.writeHead(200, {'Content-Type':'application/json'});
+            res.end(JSON.stringify(json));
+        });
+    });
+
+    app.get('/folder/:name', function(req,res){
+        var folder = req.params.name;
+        var my_key = req.remoteUser;
+        var myself = ua_sessions[my_key].session;
+        get_messages(folder, myself, function(json) {
 	        res.writeHead(200, {'Content-Type':'application/json'});
 	        res.end(JSON.stringify(json));
         });
