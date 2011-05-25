@@ -3,7 +3,6 @@ var uaclient = require('./node-uaclient/lib/uaclient');
 var connect = require('./connect/lib/connect/index');
 var fs = require('fs');
 var Log = require('log'), log = new Log(Log.INFO);
-require('./wordwrap.js');
 // functions for converting EDF responses to JSON
 var uajson = require('./ua.js');
 var uajson = new uajson.uajson;
