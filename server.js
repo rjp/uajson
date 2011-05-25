@@ -225,6 +225,26 @@ function get_user_info(auth, callback) {
     callback();
 }
 
+function get_folders(uaclient, callback) {
+    uaclient.request('folder_list', {"searchtype":3}, function(t, a) {
+        var raw_json = uajson.reply_folder_list(a, uaclient);
+        callback(raw_json);
+    });
+}
+
+
+function get_unread_folders(uaclient, callback) {
+    get_folders(uaclient, function(raw_json) {
+        var json = [];
+        for (var i in raw_json) {
+            if (raw_json.hasOwnProperty(i) && raw_json[i].unread > 0) {
+                json.push(raw_json[i]);
+            }
+        }
+        callback(json);
+    });
+}
+
 function app(app) {
     app.post('/message/read', function(req, res) {
             log.info(req.body);
