@@ -68,19 +68,20 @@ function flatten_message_list(edf, child, depth, folder) {
 function uajson() {
 };
 
-    uajson.prototype.reply_folder_list = function(edfjson, child) {
-        var x = child.recursive_flatten(edfjson, 0);
-        var json = flatten_folder_list(x, child, 0);
-        return json;
-    };
+uajson.prototype.reply_folder_list = function(edfjson, child) {
+    var x = child.recursive_flatten(edfjson, 0);
+    var json = flatten_folder_list(x, child, 0);
+    return json;
+};
 
-    uajson.prototype.reply_message_list = function(edfjson, child) {
-        // experimental
-        var x = child.recursive_flatten(edfjson, 0);
-		var y = JSON.parse(JSON.stringify(edfjson));
-		child.flatten(y);
-        var folder = y.foldername;
-        var json = flatten_message_list(x, child, 0, folder);
-        return json;
-    };
+uajson.prototype.reply_message_list = function(edfjson, child) {
+    // experimental
+	var y = JSON.parse(JSON.stringify(edfjson));
+	child.flatten(y);
+    var folder = y.foldername;
+    var x = child.recursive_flatten(edfjson, 0, folder);
+    var json = flatten_message_list(x, child, 0, folder);
+    return json;
+};
+
 exports.uajson = uajson;
