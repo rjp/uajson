@@ -25,44 +25,35 @@ function flatten_folder_list(edf, child, depth) {
 
 function flatten_message_list(edf, child, depth, folder) {
     var json = [];
+    var children = [];
+
     for(i in edf) {
         if (edf[i].tag == 'message') {
             var x = edf[i];
             var retval = {
                 "folder": folder, "epoch": x.date,
                 "id": x.value, "subject": x.subject,
-                "body": x.text, "from": x.fromname
+                "body": x.text, "from": x.fromname,
+                "replyToBy": x.replyToBy,
+                "inReplyToHierarchy": x.inReplyToHierarchy
             };
 
+            if (x.inReplyToHierarchy !== undefined) {
+                retval.inReplyTo = x.inReplyToHierarchy[0].id;
+            }
+
             if (x.read !== undefined) { retval['read'] = true; }
-
-            // broken
-            var parents = [];
-            for (var j in edf[i].children) {
-                var c = edf[i].children[j];
-                if (c.tag == 'replyto') {
-                    child.flatten(c);
-                    parents.push({"id":c.value, "from":c.fromname});
-                    retval['inReplyTo'] = c.value;
-                }
-            }
-            if (parents.length > 0) { retval['inReplyToHierarchy'] = replies; }
-
-            var replies = [];
-            for (var j in edf[i].children) {
-                var c = edf[i].children[j];
-                if (c.tag == 'replyby') {
-                    child.flatten(c);
-                    replies.push({"id":c.value, "from":c.fromname});
-                }
-            }
-            if (replies.length > 0) { retval['replyToBy'] = replies; }
             if (x.toname !== undefined) { retval['to'] = x.toname; }
 
-            json.push(retval);
+            json[x.value] = retval;
         };
     };
-    return json;
+    json.sort(function(a,b){a.id - b.id});
+    var list = [];
+    for (var i in json) {
+        list.push(json[i]);
+    }
+    return list;
 }
 
 function uajson() {
