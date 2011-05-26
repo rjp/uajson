@@ -55,7 +55,7 @@ log.info('Connect server listening on port '+config.port);
 var ua_sessions = {};
 
 function authenticate(user, pass, success, failure) {
-    log.info('authinfo is '+user+':'+pass+"; "+failure);
+    // log.info('authinfo is '+user+':'+pass+"; "+failure);
     spawn_bot(user, pass, 'http_auth', success, failure);
 }
 
@@ -313,7 +313,6 @@ function app(app) {
         var myself = ua_sessions[my_key].session;
         myself.request('message_list', {"messageid":parseInt(req.params.id, 10)}, function(t, a) {
                 if (t == 'message_list') {
-                    log.info(sys.inspect(a));
 		            var json = uajson.reply_message_list(a, myself);
                     res.writeHead(200, {'Content-Type':'application/json'});
 	                res.end(JSON.stringify(json[0])); // only one
