@@ -48,11 +48,11 @@ function flatten_message_list(edf, child, depth, folder) {
             json[x.value] = retval;
         };
     };
-    json.sort(function(a,b){a.id - b.id});
     var list = [];
     for (var i in json) {
         list.push(json[i]);
     }
+    list.sort(function(a,b){return a.id - b.id});
     return list;
 }
 
