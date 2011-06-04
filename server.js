@@ -488,15 +488,17 @@ function app(app) {
                 });
             }, function(error, newlist) {
                 res.writeHead(200, {'Content-Type':'application/json'});
-                var flattened = newlist.reduce(function(a,b){
-                    return a.concat(b);
-                });
-                flattened.sort(function(a, b) {
-                    if (a.subject == b.subject) {
-                        return a.id - b.id;
-                    }
-                    return a.subject < b.subject ? -1 : 1;
-                });
+                if (newlist.length > 0) {
+	                var flattened = newlist.reduce(function(a,b){
+	                    return a.concat(b);
+	                });
+	                flattened.sort(function(a, b) {
+	                    if (a.subject == b.subject) {
+	                        return a.id - b.id;
+	                    }
+	                    return a.subject < b.subject ? -1 : 1;
+	                });
+                }
                 res.end(JSON.stringify(flattened));
             });
         });
