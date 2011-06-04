@@ -42,7 +42,8 @@ function flatten_message_list(edf, child, depth, folder) {
                 retval.inReplyTo = x.inReplyToHierarchy[0].id;
             }
 
-            if (x.read !== undefined) { retval['read'] = true; }
+            // the 'read' key must be present for various broken clients
+            retval['read'] = (x.read !== undefined);
             if (x.toname !== undefined) { retval['to'] = x.toname; }
 
             json[x.value] = retval;
