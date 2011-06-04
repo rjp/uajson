@@ -1,9 +1,9 @@
 var sys = require('sys');
 var uaclient = require('./node-uaclient/lib/uaclient');
-var connect = require('./connect/lib/connect/index');
+var connect = require('./connect/lib/connect/index'),
+    staticFiles = require('./connect/lib/connect/middleware/staticProvider');
 var fs = require('fs');
 var Log = require('log'), log = new Log(Log.INFO);
-require('./wordwrap.js');
 // functions for converting EDF responses to JSON
 var uajson = require('./ua.js');
 var uajson = new uajson.uajson;
@@ -56,7 +56,7 @@ log.info('Connect server listening on port '+config.port);
 var ua_sessions = {};
 
 function authenticate(user, pass, success, failure) {
-    log.info('authinfo is '+user+':'+pass+"; "+failure);
+    // log.info('authinfo is '+user+':'+pass+"; "+failure);
     spawn_bot(user, pass, 'http_auth', success, failure);
 }
 
@@ -226,6 +226,73 @@ function get_user_info(auth, callback) {
     callback();
 }
 
+function get_folders(uaclient, callback) {
+    uaclient.request('folder_list', {"searchtype":3}, function(t, a) {
+        var raw_json = uajson.reply_folder_list(a, uaclient);
+        callback(raw_json);
+    });
+}
+
+function get_unread_folders(uaclient, callback) {
+    get_folders(uaclient, function(raw_json) {
+        var json = [];
+        for (var i in raw_json) {
+            if (raw_json.hasOwnProperty(i) && raw_json[i].unread > 0) {
+                json.push(raw_json[i]);
+            }
+        }
+        callback(json);
+    });
+}
+
+// get all messages from a folder
+function get_messages(folder, uaclient, callback) {
+        var folder_id = uaclient.folders[folder];
+        uaclient.request('message_list', {"folderid":folder_id, "searchtype":1}, function(t, a) {
+	        var json = uajson.reply_message_list(a, uaclient);
+            callback(json);
+        });
+}
+
+// get the unread messages from a folder
+function get_unread_messages(folder, uaclient, callback) {
+    var folder_id = uaclient.folders[folder];
+    uaclient.request('message_list', {"folderid":folder_id, "searchtype":1}, function(t, a) {
+        var raw_json = uajson.reply_message_list(a, uaclient);
+        var json = [];
+        for (var i in raw_json) {
+            if ( raw_json.hasOwnProperty(i) &&
+                !raw_json[i].hasOwnProperty('read')) {
+                json.push(raw_json[i]);
+            }
+        }
+        callback(json);
+    });
+}
+
+// this expects to be an (e, v) type callback
+function get_message_body(mid, uaclient, callback) {
+    if (g_bodies[mid] === undefined) {
+        uaclient.request('message_list', {"messageid": mid}, function(t, a) {
+	        var raw_msg = uajson.reply_message_list(a, uaclient);
+            g_bodies[mid] = raw_msg[0];
+	        callback(undefined, raw_msg[0]);
+	    })
+    } else {
+        callback(undefined, g_bodies[mid]);
+    }
+}
+
+function get_full_unread_messages(folder, uaclient, callback) {
+    get_unread_messages(folder, uaclient, function(json) {
+        map(json, function(item, index, callback) {
+            get_message_body(item.id, uaclient, callback)
+        }, function(error, newlist) {
+            callback(newlist);
+        });
+    });
+}
+
 function app(app) {
     app.post('/message/read', function(req, res) {
             log.info(req.body);
@@ -247,7 +314,6 @@ function app(app) {
         var myself = ua_sessions[my_key].session;
         myself.request('message_list', {"messageid":parseInt(req.params.id, 10)}, function(t, a) {
                 if (t == 'message_list') {
-                    log.info(sys.inspect(a));
 		            var json = uajson.reply_message_list(a, myself);
                     res.writeHead(200, {'Content-Type':'application/json'});
 	                res.end(JSON.stringify(json[0])); // only one
@@ -263,17 +329,9 @@ function app(app) {
         // tricky!
         var my_key = req.remoteUser;
         var myself = ua_sessions[my_key].session;
-        myself.request('folder_list', {"searchtype":3}, function(t, a) {
-	            var raw_json = uajson.reply_folder_list(a, myself);
-                var json = [];
-                for (var i in raw_json) {
-                    if (raw_json.hasOwnProperty(i) &&
-                        raw_json[i].unread > 0) {
-                        json.push(raw_json[i]);
-                    }
-                }
-                res.writeHead(200, {'Content-Type':'application/json'});
-                res.end(JSON.stringify(json));
+        get_unread_folders(myself, function(json) {
+            res.writeHead(200, {'Content-Type':'application/json'});
+            res.end(JSON.stringify(json));
         });
     });
 
@@ -301,10 +359,9 @@ function app(app) {
         // tricky!
         var my_key = req.remoteUser;
         var myself = ua_sessions[my_key].session;
-        myself.request('folder_list', {"searchtype":3}, function(t, a) {
-	            var json = uajson.reply_folder_list(a, myself);
-                res.writeHead(200, {'Content-Type':'application/json'});
-                res.end(JSON.stringify(json));
+        get_folders(myself, function(json) {
+            res.writeHead(200, {'Content-Type':'application/json'});
+            res.end(JSON.stringify(json));
         });
     });
 
@@ -319,80 +376,30 @@ function app(app) {
     });
 
     app.get('/folder/:name/unread', function(req,res){
-        log.warning("Auth OK, requesting a message list");
-        res.writeHead(200, {'Content-Type':'application/json'});
-        var folder = req.params.name.toLowerCase();
-        folder_info(folder, function(folderinfo){
-            // tricky!
-            var my_key = req.remoteUser;
-            var myself = ua_sessions[my_key].session;
-            myself.request('message_list', {"folderid":folderinfo.folder_id, "searchtype":1}, function(t, a) {
-	            var raw_json = uajson.reply_message_list(a, myself);
-                var json = [];
-                for (var i in raw_json) {
-                    if (raw_json.hasOwnProperty(i) &&
-                        ! raw_json[i].hasOwnProperty('read')) {
-                        json.push(raw_json[i]);
-                    }
-                }
-	            res.writeHead(200, {'Content-Type':'application/json'});
-	            res.end(JSON.stringify(json));
-            });
+        var folder = req.params.name;
+        var my_key = req.remoteUser;
+        var myself = ua_sessions[my_key].session;
+        get_unread_messages(folder, myself, function(json) {
+            res.writeHead(200, {'Content-Type':'application/json'});
+            res.end(JSON.stringify(json));
         });
     });
 
     app.get('/folder/:name/unread/full', function(req,res){
-        log.warning("Auth OK, requesting a message list");
-        res.writeHead(200, {'Content-Type':'application/json'});
-        var folder = req.params.name.toLowerCase();
-        folder_info(folder, function(folderinfo){
-            // tricky!
-            var my_key = req.remoteUser;
-            var myself = ua_sessions[my_key].session;
-            myself.request('message_list', {"folderid":folderinfo.folder_id, "searchtype":1}, function(t, a) {
-	            var raw_json = uajson.reply_message_list(a, myself);
-                var json = [];
-                for (var i in raw_json) {
-                    if (raw_json.hasOwnProperty(i) &&
-                        ! raw_json[i].hasOwnProperty('read')) {
-                        json.push(raw_json[i]);
-                    }
-                }
-                map(json, function(item, index, callback) {
-                    if (g_bodies[item.id] === undefined) {
-                        log.info("raw fetching "+item.id);
-	                    myself.request('message_list', {"messageid": item.id}, function(t, a) {
-				            var raw_msg = uajson.reply_message_list(a, myself);
-			                var message = [];
-			                for (var i in raw_msg) {
-			                    if (raw_msg.hasOwnProperty(i)) {
-			                        message.push(raw_msg[i]);
-			                    }
-			                }
-                            g_bodies[item.id] = message[0];
-	                        callback(undefined, message[0]);
-	                    })
-                    } else {
-                        log.info("cached "+item.id);
-                        callback(undefined, g_bodies[item.id]);
-                    }
-                }, function(error, newlist) {
-	                res.writeHead(200, {'Content-Type':'application/json'});
-                    res.end(JSON.stringify(newlist));
-                });
-            });
-        });
-    });
-    app.get('/folder/:name', function(req,res){
-        res.writeHead(200, {'Content-Type':'application/json'});
         var folder = req.params.name;
-        // tricky!
         var my_key = req.remoteUser;
         var myself = ua_sessions[my_key].session;
-        var folder_id = myself.folders[folder];
-        log.warning("Auth OK, requesting a message list for "+folder+" = "+folder_id);
-        myself.request('message_list', {"folderid":folder_id, "searchtype":1}, function(t, a) {
-	        var json = uajson.reply_message_list(a, myself);
+        get_full_unread_messages(folder, myself, function(json) {
+            res.writeHead(200, {'Content-Type':'application/json'});
+            res.end(JSON.stringify(json));
+        });
+    });
+
+    app.get('/folder/:name', function(req,res){
+        var folder = req.params.name;
+        var my_key = req.remoteUser;
+        var myself = ua_sessions[my_key].session;
+        get_messages(folder, myself, function(json) {
 	        res.writeHead(200, {'Content-Type':'application/json'});
 	        res.end(JSON.stringify(json));
         });
@@ -469,6 +476,35 @@ function app(app) {
             }
         });
     });
+
+    app.get('/threads/unread', function(req, res) {
+        var my_key = req.remoteUser;
+        var myself = ua_sessions[my_key].session;
+        get_unread_folders(myself, function(json) {
+            map(json, function(item, index, callback) {
+                log.info("recursing into "+sys.inspect(item));
+                get_unread_messages(item.folder, myself, function(v){
+                    callback(undefined, v);
+                });
+            }, function(error, newlist) {
+                res.writeHead(200, {'Content-Type':'application/json'});
+                if (newlist.length > 0) {
+	                var flattened = newlist.reduce(function(a,b){
+	                    return a.concat(b);
+	                });
+	                flattened.sort(function(a, b) {
+	                    if (a.subject == b.subject) {
+	                        return a.id - b.id;
+	                    }
+	                    return a.subject < b.subject ? -1 : 1;
+	                });
+                }
+                res.end(JSON.stringify(flattened));
+            });
+        });
+    });
+
+    app.get('/UAcebook/*', staticFiles('.'));
 }
 
 function reaper() {
