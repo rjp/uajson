@@ -1,0 +1,226 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+
+<HTML>
+
+<HEAD>
+
+<TITLE>UAcebook</TITLE>
+
+<META http-equiv=Content-Type content="text/html; charset=utf-8">
+
+<LINK title=styles href="styles.css" type="text/css" rel="stylesheet">
+
+<script src="json2.js"></script>
+<script src="jquery-1.4.4.min.js"></script>
+
+<script src="config.js"></script>
+<script src="uaJSON.js"></script>
+<script src="UAcebook.js"></script>
+
+<script type="text/javascript">
+
+function runCommand(command) {
+  var text = command.value;
+  var clear = true;
+
+  try {
+    var space = text.indexOf(" ");
+    if(space > 0) {
+      var command = text.substring(0, space).toLowerCase();
+      var args = text.substring(space + 1);
+      if(debug) {
+        myAlert("Command '" + command + "', args '" + args + "'", "runCommand");
+      }
+      if(command == "j" && args.length > 0) {
+        if(args.charAt(0) >= '0' && args.charAt(0) <= '9') {
+          showMessage(args);
+        } else {
+          showFolder(args);
+        }
+      } else if(command == "e") {
+        var space = args.indexOf(" ");
+        if(space > 0) {
+          var subject = args.substring(0, space);
+          args = args.substring(space + 1);
+          postMessage("test1", null, subject, null, args, function(response) {
+            myAlert("Posted test message", "runCommand");
+          });
+        }
+      } else if(command == "p") {
+        var space = args.indexOf(" ");
+        if(space > 0) {
+          var to = args.substring(0, space);
+          args = args.substring(space + 1);
+          postMessage("private", to, "Diverted Page", null, args, function(response) {
+            myAlert("Paged " + to, "runCommand");
+          });
+        }
+      } else {
+        myAlert("Quit your crazy jibber jabber foo", "runCommand");
+        clear = false;
+      }
+    } else {
+      myAlert("Bad command " + text, "runCommand");
+      clear = false;
+    }
+  } catch(e) {
+    myAlert("Oh dear, " + e.name + ". " + e.message, "runCommand");
+    clear = false;
+  }
+  
+  if(clear) {
+	if(debug) {
+	  myAlert("Clearing the text", "runCommand");
+	}
+    $("#command").val("");
+  }
+}
+
+$(document).ready(function() {
+  showBanner();
+	
+  //alert("Calling showUnreadFolders");
+  showFolders("Unread");
+
+  showUsername();
+});
+
+</script>
+
+</HEAD>
+
+<BODY>
+
+<A href="https://ua2.org/"><IMG alt="UNaXcess" src="UA.gif" border=0></A>
+
+<DIV id="folders" class="box" style="margin: 4px">
+
+<input type="checkbox" onchange="debug = !debug"/>Debug
+<UL>
+  <LI>Folders (&lt;unread&gt; of &lt;total&gt;)...</LI>
+  <LI>
+  <A id ="showUnreadFolders" href="#" onclick="showFolders('Unread');return false">Unread</A>
+  / <A id="showSubscribedFolders" href="#" onclick="showFolders('Subscribed');return false">Subscribed</A>
+  / <A id="showAllFolders" href="#" onclick="showFolders('All');return false">All</A>
+  </LI>
+  <LI><IMG height=1 src="break.gif" width="100%"></LI>
+  <LI>
+  <DIV id="foldersList">
+  </DIV>
+  </LI>
+  <LI><IMG height=1 src="break.gif" width="100%"></LI>
+</UL>
+
+</DIV>
+
+<DIV id="rightside">
+
+<TABLE class="article" cellSpacing=0 cellPadding=0>
+
+<TR>
+<td class=articleheader>
+<P>
+Hi <span id="username" style="font-weight: bold;">$USERNAME</span>. You have <span id="totalUnread" style="font-weight: bold;">0</span> unread messages (last refresh <span id="lastRefresh" style="font-weight: bold;">00:00</span>).<BR>
+</P>
+Commands go in the box.<br>
+<form>
+<input id="command" type="text" size="60" onKeyPress="if(event.keyCode == 13) { runCommand(form.command); } return event.keyCode != 13"/>
+</form>
+</td>
+</TR>
+
+<TR>
+<td class=articlebody>
+
+<div class="box">
+<table width="100%" class="box">
+<tr>
+<td width="150" style="vertical-align: middle;">
+<A href="#" id="showUnreadMessages" onclick="setMessageFilter('Unread');return false">Unread</A> / <A id="showAllMessages" href="#" onclick="setMessageFilter('All');return false">All</A>
+</td>
+<td width="*" style="vertical-align: middle; text-align: right;">
+<form>
+<button onclick="enablePostMode(null);return false">Post</button>
+<button onclick="return false">Catch Up Folder</button>
+</form>
+</td>
+</tr>
+</table>
+</div>
+
+<div id="folder" class="scroll">
+&nbsp;<br>
+</div>
+
+</TD>
+</TR>
+
+<TR id="viewMessage" style="display: none;">
+<td class=articlebody>
+<div class="box">
+<table class="box">
+<tr>
+<td>
+<span id="messageheaders">
+&nbsp;
+</span>
+</td>
+<td style="text-align: right;">
+<form>
+<button type="submit" onclick="enablePostMode(currentMessage); return false">Reply</button>
+<br>
+<button type="submit" onclick="return false">Catch Up Thread</button>
+</form>
+</td>
+</tr>
+</table>
+</div>
+<div id="messagebody">
+&nbsp;
+</div>
+<div id="messagefooters" class="box" style="display: none;">
+&nbsp;
+</div>
+</TD>
+</TR>
+
+<TR id="postMessage" style="display: none;">
+<td class=articlebody>
+<form>
+<div id="messageheaders" class="box">
+<ul>
+<li><span style="width:25%">Folder</span><input id="postFolder" type="text" style="width:75%"/></li>
+<li><span style="width:25%">To</span><input id="postTo" type="text" style="width:75%"/></li>
+<li><span style="width:25%">Subject</span><input id="postSubject" type="text" style="width:75%"/></li>
+</ul>
+</div>
+<div id="messagebody">
+<textarea id="postBody" cols="80" rows="10">
+</textarea>
+</div>
+<input id="postReplyId" type="hidden" value=""/>
+<div style="text-align:right">
+<button type="submit" onclick="postMessage(form.postFolder.value, form.postTo.value, form.postSubject.value, form.postReplyId.value, form.postBody.value, function(response) { disablePostMode(); } ); return false">Send</button>
+<br>
+<button type="reset" onclick="disablePostMode(); return false">Cancel</button>
+</div>
+</form>
+</td>
+</TR>
+
+<!--
+<TR>
+<td class=articlebody>
+<P>Annoucements go here?
+</P>
+</TD>
+</TR>
+-->
+
+</TABLE>
+
+</DIV>
+
+</BODY>
+
+</HTML>

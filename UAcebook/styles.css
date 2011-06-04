@@ -1,0 +1,71 @@
+BODY {
+	PADDING: 0px; MARGIN: 0px; BACKGROUND-COLOR: white; FONT-SIZE: 10pt; FONT-FAMILY: sans-serif;
+}
+
+.box {
+	FONT-SIZE: 10pt; BORDER: #213139 1px solid; BACKGROUND: #296ba5; COLOR: #d6d6e7; WHITE-SPACE: nowrap; padding: 5px;
+}
+.box UL {
+	PADDING-RIGHT: 2px; PADDING-LEFT: 2px; MARGIN-LEFT: 2px; LIST-STYLE-TYPE: none;
+}
+.box LI {
+	PADDING-RIGHT: 2px; PADDING-LEFT: 2px; MARGIN-LEFT: 2px; LIST-STYLE-TYPE: none;
+}
+.box A {
+	COLOR: #d6d6e7; FONT-STYLE: italic; TEXT-DECORATION: none;
+}
+.box A:hover {
+	COLOR: #213139;
+}
+
+#rightside {
+	PADDING: 3px; padding-top: 5px; padding-right: 0px; LEFT: 215px; BORDER-LEFT: gray 1px dotted; WIDTH: 600px; POSITION: absolute; TOP: 0px; HEIGHT: auto;
+}
+
+#folders {
+	POSITION: fixed; LEFT: 4px; WIDTH: 200px; TOP: 82px; HEIGHT: 400px;
+}
+
+#messagebody {
+	FONT-SIZE: 11pt; COLOR: #000000; padding: 5px;
+}
+
+#folder {
+	margin: 5px; height: 200px; overflow: auto;
+}
+
+#folder A {
+	COLOR: #296ba5
+}
+
+TABLE.article {
+	BORDER: #213139 1px solid; PADDING: 0px; MARGIN: 4px; WIDTH: auto;
+}
+
+.articleheader {
+	PADDING: 4px; BACKGROUND: #d6d6e7; COLOR: #213139; TEXT-ALIGN: right; BORDER-bottom: #000000 1px solid;
+}
+
+.articlebody {
+	BORDER: #dddddd 3px solid;
+}
+
+.selected {
+	FONT-WEIGHT: bold; FONT-STYLE: italic 
+}
+
+.read {
+	COLOR: #d6d6e7; FONT-SIZE: 10pt; TEXT-DECORATION: none
+}
+
+.unread{
+	COLOR: #d6d6e7; FONT-SIZE: 10pt; FONT-WEIGHT: bold; TEXT-DECORATION: none
+}
+
+.currentFolder {
+  COLOR: #296ba5; BACKGROUND: #d6d6e7;
+}
+
+.currentMessage {
+  COLOR: white; BACKGROUND: #d6d6e7;
+}

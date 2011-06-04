@@ -1,6 +1,7 @@
 var sys = require('sys');
 var uaclient = require('./node-uaclient/lib/uaclient');
-var connect = require('./connect/lib/connect/index');
+var connect = require('./connect/lib/connect/index'),
+    staticFiles = require('./connect/lib/connect/middleware/staticProvider');
 var fs = require('fs');
 var Log = require('log'), log = new Log(Log.INFO);
 // functions for converting EDF responses to JSON
@@ -500,6 +501,8 @@ function app(app) {
             });
         });
     });
+
+    app.get('/UAcebook/*', staticFiles('.'));
 }
 
 function reaper() {
