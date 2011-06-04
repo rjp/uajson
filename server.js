@@ -261,9 +261,10 @@ function get_unread_messages(folder, uaclient, callback) {
         var raw_json = uajson.reply_message_list(a, uaclient);
         var json = [];
         for (var i in raw_json) {
-            if ( raw_json.hasOwnProperty(i) &&
-                !raw_json[i].hasOwnProperty('read')) {
-                json.push(raw_json[i]);
+            if (raw_json.hasOwnProperty(i)) {
+                if (! raw_json[i].read) {
+                    json.push(raw_json[i]);
+                }
             }
         }
         callback(json);
