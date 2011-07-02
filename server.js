@@ -313,7 +313,16 @@ function app(app) {
     app.get('/message/:id', function(req,res){
         var my_key = req.remoteUser;
         var myself = ua_sessions[my_key].session;
-        myself.request('message_list', {"messageid":parseInt(req.params.id, 10)}, function(t, a) {
+        var message_id = parseInt(req.params.id, 10);
+
+        // bail with a 500 if :id isn't a number
+        if (isNaN(message_id)) {
+            res.writeHead(500, {'Content-Type':'application/json'});
+            res.end(JSON.stringify({"error":"message id must be numerical"});
+            return;
+        }
+
+        myself.request('message_list', {"messageid": message_id}, function(t, a) {
                 if (t == 'message_list') {
 		            var json = uajson.reply_message_list(a, myself);
                     res.writeHead(200, {'Content-Type':'application/json'});
@@ -411,6 +420,7 @@ function app(app) {
         var my_key = req.remoteUser;
         var myself = ua_sessions[my_key].session;
         var request = { "subject": post.subject, "text": post.body };
+
         if (post.to !== undefined) {
             var userid = myself.get_user(post.to);
             if (userid !== undefined) {
