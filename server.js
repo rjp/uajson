@@ -318,7 +318,7 @@ function app(app) {
         // bail with a 500 if :id isn't a number
         if (isNaN(message_id)) {
             res.writeHead(500, {'Content-Type':'application/json'});
-            res.end(JSON.stringify({"error":"message id must be numerical"});
+            res.end(JSON.stringify({"error":"message id must be numerical"}));
             return;
         }
 
