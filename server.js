@@ -469,6 +469,10 @@ function app(app) {
                 request.toname = post.to;
             }
         }
+        // we might want to reply in a different folder
+        if (post.folder !== undefined) {
+            request.folderid = myself.folders[post.name];
+        }
         log.info("R: "+JSON.stringify(request));
         myself.request('message_add', request, function(t, a) {
             log.info("t="+t+", "+JSON.stringify(a));
