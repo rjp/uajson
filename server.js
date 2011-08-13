@@ -237,7 +237,11 @@ function get_unread_folders(uaclient, callback) {
     get_folders(uaclient, function(raw_json) {
         var json = [];
         for (var i in raw_json) {
-            if (raw_json.hasOwnProperty(i) && raw_json[i].unread > 0) {
+            if (
+                  raw_json.hasOwnProperty(i)
+               && raw_json[i].unread > 0
+               && raw_json[i].subscribed === true
+               ) {
                 json.push(raw_json[i]);
             }
         }
@@ -355,7 +359,7 @@ function app(app) {
                 var json = [];
                 for (var i in raw_json) {
                     if (raw_json.hasOwnProperty(i) &&
-                        raw_json[i].subscribed) {
+                        raw_json[i].subscribed === true) {
                         json.push(raw_json[i]);
                     }
                 }
