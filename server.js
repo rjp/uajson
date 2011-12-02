@@ -1,11 +1,17 @@
+//
 var sys = require('sys');
-var uaclient = require('./node-uaclient/lib/uaclient');
 var connect = require('./connect/lib/connect/index'),
     staticFiles = require('./connect/lib/connect/middleware/staticProvider');
 var fs = require('fs');
 var Log = require('log'), log = new Log(Log.INFO);
+
+// 
+var uaclient = require('./node-uaclient/lib/uaclient');
+
 // functions for converting EDF responses to JSON
 var uajson = require('./ua.js');
+
+// Naming Things Is Hard.
 var uajson = new uajson.uajson;
 
 var g_req;
@@ -60,6 +66,8 @@ function authenticate(user, pass, success, failure) {
     spawn_bot(user, pass, 'http_auth', success, failure);
 }
 
+// Badly named but useful: convert an Array/Hash of Buffers into UTF8 Strings. 
+// Sadly never used.
 function buffer_to_strings(x) {
     for(var i in x) {
         if (typeof x === "buffer") {
@@ -69,6 +77,7 @@ function buffer_to_strings(x) {
     return x;
 }
 
+// This is a) incorrectly named, b) crazy, and c) never used.
 function debuffer_hash(h) {
     for(var i in h) {
         if (typeof h[i] === 'string') {
@@ -101,6 +110,7 @@ function map(list, each_callback, final_callback) {
     }
 };
 
+// Ruby's Array#compact
 function remove_undef(list) {
     var outlist = [];
     for (var i in list) {
@@ -111,6 +121,7 @@ function remove_undef(list) {
     return outlist;
 }
 
+// uh?
 function mark_read_mid(myself, item, key, callback) {
     myself.request('message_mark_read', {"messageid":item}, function(t,a) {
         if (t === "message_mark_read") {
@@ -121,6 +132,8 @@ function mark_read_mid(myself, item, key, callback) {
     });
 }
 
+// Persistent child handling - 
+// this should be abstracted out into its own library.
 // reason is 'boot', 'settings' or 'interval'
 function spawn_bot(user, pass, reason, success, failure) {
     var should_spawn = false; // default to not spawning
@@ -258,7 +271,7 @@ function get_messages(folder, uaclient, callback) {
         });
 }
 
-// get the unread messages from a folder
+// Get the unread messages from a folder. 
 function get_unread_messages(folder, uaclient, callback) {
     var folder_id = uaclient.folders[folder];
     uaclient.request('message_list', {"folderid":folder_id, "searchtype":1}, function(t, a) {
@@ -298,9 +311,15 @@ function get_full_unread_messages(folder, uaclient, callback) {
     });
 }
 
+// The meat is our Connect() app. There's a lot here which could be
+// refactored - eg. getting the session based on the remote user.
+// Some kind of before() hook would be ideal. Express can do this 
+// with `app.all()` or passing extra callbacks to routers
+// eg. `app.get('/moo', cow, function(req, res) {...})`
 function app(app) {
+    // 
     app.post('/message/read', function(req, res) {
-            log.info(req.body);
+        //-log.info(req.body);
         var messages = req.body;
         log.info(sys.inspect(messages));
         var my_key = req.remoteUser;
@@ -319,7 +338,8 @@ function app(app) {
         var myself = ua_sessions[my_key].session;
         var message_id = parseInt(req.params.id, 10);
 
-        // bail with a 500 if :id isn't a number
+        // Here we bail with a 500 if :id isn't a number - better to check
+        // this in the router definition if possible (cf Express).
         if (isNaN(message_id)) {
             res.writeHead(500, {'Content-Type':'application/json'});
             res.end(JSON.stringify({"error":"message id must be numerical"}));
@@ -526,8 +546,13 @@ function app(app) {
     app.get('/UAcebook/*', staticFiles('.'));
 }
 
+// Sometimes our child streams will get stuck or sit idle. 
 function reaper() {
     var now = new Date().getTime();
+    // We could optimise this by keeping track of our oldest activity
+    // and only triggering a scan of the sessions table if the oldest
+    // could be reaped. Although then you have to track which is now 
+    // the oldest living session whilst reaping.  
     for(i in ua_sessions) {
         if (ua_sessions.hasOwnProperty(i) &&
             now - ua_sessions[i].last > SESSION_TIMEOUT) {
@@ -539,5 +564,7 @@ function reaper() {
     }
 }
 
-// call the reaper every 15 seconds
-setInterval(reaper, 15000);
+// There's no need to reap more frequently than every few minutes. Since
+// the timeout is relatively long (15 minutes by default), there's no great
+// rush to reap them immediately they cross the boundary.
+setInterval(reaper, 1000 * 2 * 60);
