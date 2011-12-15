@@ -318,6 +318,7 @@ function app(app) {
         var my_key = req.remoteUser;
         var myself = ua_sessions[my_key].session;
         var message_id = parseInt(req.params.id, 10);
+        var edf_debug = req.headers['edf'];
 
         // bail with a 500 if :id isn't a number
         if (isNaN(message_id)) {
@@ -326,9 +327,12 @@ function app(app) {
             return;
         }
 
-        myself.request('message_list', {"messageid": message_id}, function(t, a) {
+        myself.request('message_list', {"messageid": message_id}, function(t, a, edf) {
                 if (t == 'message_list') {
 		            var json = uajson.reply_message_list(a, myself);
+                    if (edf_debug === 'on') {
+                        json[0]['edf'] = edf;
+                    }
                     res.writeHead(200, {'Content-Type':'application/json'});
 	                res.end(JSON.stringify(json[0])); // only one
                 } else {
