@@ -72,6 +72,7 @@ function uajson() {
 };
 
 uajson.prototype.reply_folder_list = function(edfjson, child) {
+    sys.puts("F " + JSON.stringify(edfjson));
     var x = child.recursive_flatten(edfjson, 0);
     var json = flatten_folder_list(x, child, 0);
     return json;
@@ -79,6 +80,7 @@ uajson.prototype.reply_folder_list = function(edfjson, child) {
 
 uajson.prototype.reply_message_list = function(edfjson, child) {
     // experimental
+    sys.puts("X " + JSON.stringify(edfjson));
 	var y = JSON.parse(JSON.stringify(edfjson));
 	child.flatten(y);
     var folder = y.foldername;
