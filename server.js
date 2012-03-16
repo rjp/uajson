@@ -52,6 +52,7 @@ var server = connect.createServer(
     connect.bodyDecoder(),
     connect.errorHandler({ dumpExceptions: true, showStack: true })
 );
+server.use(connect.gzip());
 server.use(connect.basicAuth(authenticate, 'uajson:'+config.port));
 server.use('/', connect.router(app));
 
