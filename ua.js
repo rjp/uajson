@@ -35,7 +35,8 @@ function flatten_message_list(edf, child, depth, folder) {
                 "id": x.value, "subject": x.subject,
                 "body": x.text, "from": x.fromname,
                 "replyToBy": x.replyToBy,
-                "inReplyToHierarchy": x.inReplyToHierarchy
+                "inReplyToHierarchy": x.inReplyToHierarchy,
+                "thread": x.threadid
             };
 
             if (x.inReplyToHierarchy !== undefined) {
