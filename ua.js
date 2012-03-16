@@ -47,6 +47,9 @@ function flatten_message_list(edf, child, depth, folder) {
             retval['read'] = (x.read !== undefined);
             if (x.toname !== undefined) { retval['to'] = x.toname; }
 
+            if (x.annotations) { retval['annotations'] = x.annotations; }
+            if (x.replies) { retval['replyToBy'] = x.replies; }
+
             json[x.value] = retval;
         };
     };
