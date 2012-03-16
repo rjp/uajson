@@ -50,6 +50,15 @@ function flatten_message_list(edf, child, depth, folder) {
             if (x.annotations) { retval['annotations'] = x.annotations; }
             if (x.replies) { retval['replyToBy'] = x.replies; }
 
+// special processing for poll results
+// <reply="message_list"><message=2121016><msgtype=2/><date=1323443132/><fromid=77/><text="Which is better?"/><subject="Roses v Quality Street"/><votes><votetype=40/><vote=1><text="Roses"/><numvotes=5/></><vote=2><text="Quality Street"/><numvotes=10/></><numvotes=15/></><fromname="David"/><read=1/><replyby=2121017><read=1/><fromid=1693/><fromname="pwaring"/></><replyby=2121034><read=1/><fromid=358/><fromname="kat"/></><replyby=2121181><read=1/><fromid=546/><fromname="S8N"/></><numreplies=40/><msgpos=41/></><searchtype=0/><folderid=2200/><foldername="Food"/><nummsgs=102/></>
+            if (x.msgtype == 2) { // multiple choice poll?
+                var output = x.text + "\n\n";
+                sys.puts("V "+x.id);
+                sys.puts(sys.inspect(x.votes));
+                retval['testVote'] = JSON.stringify(x);
+            }
+
             json[x.value] = retval;
         };
     };
@@ -65,6 +74,7 @@ function uajson() {
 };
 
 uajson.prototype.reply_folder_list = function(edfjson, child) {
+    sys.puts("F " + JSON.stringify(edfjson));
     var x = child.recursive_flatten(edfjson, 0);
     var json = flatten_folder_list(x, child, 0);
     return json;
@@ -72,6 +82,7 @@ uajson.prototype.reply_folder_list = function(edfjson, child) {
 
 uajson.prototype.reply_message_list = function(edfjson, child) {
     // experimental
+    sys.puts("X " + JSON.stringify(edfjson));
 	var y = JSON.parse(JSON.stringify(edfjson));
 	child.flatten(y);
     var folder = y.foldername;
