@@ -299,7 +299,7 @@ function get_unread_messages(folder, uaclient, callback) {
 // this expects to be an (e, v) type callback
 function get_message_body(mid, uaclient, callback) {
     if (g_bodies[mid] === undefined) {
-        uaclient.request('message_list', {"messageid": mid}, function(t, a) {
+        uaclient.request('message_list', {"messageid": mid, "markread": 0}, function(t, a) {
 	        var raw_msg = uajson.reply_message_list(a, uaclient);
             g_bodies[mid] = raw_msg[0];
 	        callback(undefined, raw_msg[0]);
