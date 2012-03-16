@@ -1,4 +1,4 @@
-var sys = require('sys');
+var sys = require('util');
 var util = require('util');
 
 // bloody tree structure idiot nonsense

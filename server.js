@@ -1,5 +1,5 @@
 //
-var sys = require('sys');
+var sys = require('util');
 var connect = require('./connect/lib/connect/index'),
     staticFiles = require('./connect/lib/connect/middleware/staticProvider');
 var fs = require('fs');
