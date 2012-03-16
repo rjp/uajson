@@ -111,6 +111,13 @@ function map(list, each_callback, final_callback) {
     }
 };
 
+// Ruby's Array#flatten
+function remove_sublists(arr){
+    return arr.reduce(function(acc, val){
+        return acc.concat(val.constructor === Array ? remove_sublists(val) : val);
+    },[]);
+}
+
 // Ruby's Array#compact
 function remove_undef(list) {
     var outlist = [];
@@ -356,6 +363,23 @@ function app(app) {
                     res.writeHead(404, {'Content-Type':'application/json'});
 	                res.end(JSON.stringify({"error":"no such message"}));
                 }
+        });
+    });
+
+    app.get('/messages/unread/full', function(req,res){
+        var my_key = req.remoteUser;
+        var myself = ua_sessions[my_key].session;
+        get_unread_folders(myself, function(json) {
+            map(json, function(item, index, callback) {
+                sys.puts(JSON.stringify(item));
+                get_full_unread_messages(item.folder, myself, function(v){
+                    callback(undefined, v);
+                });
+            }, function(error, newlist) {
+                var outlist = remove_sublists(newlist);
+                res.writeHead(200, {'Content-Type':'application/json'});
+                res.end(JSON.stringify(outlist));
+            });
         });
     });
 
